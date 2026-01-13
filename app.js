@@ -2,6 +2,7 @@ import express from "express";
 import { exec } from "child_process";
 import { SERVER_CONFIGS } from "./configs/serverConfigs.js";
 import { logInfo, logError } from "./logger.js";
+import { SUPPORTED_VERSIONS } from "./enums/versions.js";
 
 const app = express();
 app.use(express.json());
@@ -21,37 +22,38 @@ const DEPLOYMENT_PORT = 4000;
  * }
  */
 app.post("/deploy", (req, res) => {
-  const { containerName, type, memory = "1g", cpus = "1" } = req.body;
+  const { containerName, type, version, memory = "1g", cpus = "1" } = req.body;
 
   logInfo("Incoming deploy request", {
     containerName,
     type,
-    memory,
-    cpus,
+    version,
   });
 
-  if (!containerName || !type) {
-    logError("Missing required fields", req.body);
-    return res
-      .status(400)
-      .json({ error: "containerName and type are required" });
+  if (!containerName || !type || !version) {
+    return res.status(400).json({
+      error: "containerName, type and version are required",
+    });
+  }
+
+  if (!SUPPORTED_VERSIONS.includes(version)) {
+    return res.status(400).json({
+      error: "Unsupported Minecraft version",
+    });
   }
 
   const config = SERVER_CONFIGS[type];
 
   if (!config) {
-    logError("Invalid server type", { type });
-    return res.status(400).json({ error: "Invalid server type" });
+    return res.status(400).json({
+      error: "Invalid server type",
+    });
   }
 
-  const { image, internalPort, env } = config;
-
-  logInfo("Resolved server configuration", {
-    type,
-    image,
-    internalPort,
-    env,
-  });
+  const env = {
+    ...config.baseEnv,
+    VERSION: version,
+  };
 
   const envArgs = Object.entries(env)
     .map(([k, v]) => `-e ${k}=${v}`)
@@ -63,49 +65,26 @@ app.post("/deploy", (req, res) => {
     --memory=${memory} \
     --cpus=${cpus} \
     ${envArgs} \
-    ${image}
+    ${config.image}
   `;
 
-  logInfo("Executing docker run", {
-    containerName,
-    image,
-  });
+  logInfo("Starting container", { containerName });
 
   exec(dockerRunCmd, (err, stdout, stderr) => {
     if (err) {
-      logError("Docker run failed", {
-        containerName,
-        stderr,
-        error: err.message,
-      });
-
+      logError("Docker run failed", { stderr });
       return res.status(500).json({
         error: "Docker run failed",
         details: stderr || err.message,
       });
     }
 
-    logInfo("Docker container started", {
-      containerName,
-      stdout: stdout?.trim(),
-    });
-
     setTimeout(() => {
-      const inspectCmd = `docker port ${containerName} ${internalPort}`;
-
-      logInfo("Inspecting container port", {
-        containerName,
-        internalPort,
-      });
+      const inspectCmd = `docker port ${containerName} ${config.internalPort}`;
 
       exec(inspectCmd, (err, stdout, stderr) => {
         if (err) {
-          logError("Failed to get assigned port", {
-            containerName,
-            stderr,
-            error: err.message,
-          });
-
+          logError("Port inspection failed", { stderr });
           return res.status(500).json({
             error: "Failed to get assigned port",
             details: stderr || err.message,
@@ -114,14 +93,17 @@ app.post("/deploy", (req, res) => {
 
         const hostPort = stdout.trim().split(":").pop();
 
-        logInfo("Port assigned successfully", {
+        logInfo("Server deployed successfully", {
           containerName,
           hostPort,
+          version,
+          type,
         });
 
-        return res.json({
+        res.json({
           containerName,
           type,
+          version,
           hostPort,
           running: true,
         });

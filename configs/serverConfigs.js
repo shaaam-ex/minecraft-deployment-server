@@ -1,37 +1,35 @@
-import { ServerType } from "../types/server.js";
-
 export const SERVER_CONFIGS = {
-  [ServerType.VANILLA]: {
+  VANILLA: {
     image: "itzg/minecraft-server",
     internalPort: 25565,
-    env: {
+    baseEnv: {
       EULA: "TRUE",
       TYPE: "VANILLA",
     },
   },
 
-  [ServerType.PAPER]: {
+  PAPER: {
     image: "itzg/minecraft-server",
     internalPort: 25565,
-    env: {
+    baseEnv: {
       EULA: "TRUE",
       TYPE: "PAPER",
     },
   },
 
-  [ServerType.FABRIC]: {
+  FABRIC: {
     image: "itzg/minecraft-server",
     internalPort: 25565,
-    env: {
+    baseEnv: {
       EULA: "TRUE",
       TYPE: "FABRIC",
     },
   },
 
-  [ServerType.FORGE]: {
+  FORGE: {
     image: "itzg/minecraft-server",
     internalPort: 25565,
-    env: {
+    baseEnv: {
       EULA: "TRUE",
       TYPE: "FORGE",
     },
