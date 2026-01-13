@@ -5,6 +5,7 @@ export const SERVER_CONFIGS = {
     baseEnv: {
       EULA: "TRUE",
       TYPE: "VANILLA",
+      ONLINE_MODE: "FALSE",
     },
   },
 
@@ -14,6 +15,7 @@ export const SERVER_CONFIGS = {
     baseEnv: {
       EULA: "TRUE",
       TYPE: "PAPER",
+      ONLINE_MODE: "FALSE",
     },
   },
 
@@ -23,6 +25,7 @@ export const SERVER_CONFIGS = {
     baseEnv: {
       EULA: "TRUE",
       TYPE: "FABRIC",
+      ONLINE_MODE: "FALSE",
     },
   },
 
@@ -32,6 +35,7 @@ export const SERVER_CONFIGS = {
     baseEnv: {
       EULA: "TRUE",
       TYPE: "FORGE",
+      ONLINE_MODE: "FALSE",
     },
   },
 };
