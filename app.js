@@ -1,6 +1,6 @@
 import express from "express";
 import { exec } from "child_process";
-import { SERVER_CONFIGS } from "./configs/serverConfigs";
+import { SERVER_CONFIGS } from "./configs/serverConfigs.js";
 
 const app = express();
 app.use(express.json());
