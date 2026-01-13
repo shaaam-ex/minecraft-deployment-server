@@ -1,4 +1,5 @@
 export const SUPPORTED_VERSIONS = [
+  "1.21.4",
   "1.20.4",
   "1.20.2",
   "1.20.1",
