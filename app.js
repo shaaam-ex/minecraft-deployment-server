@@ -1,5 +1,6 @@
 import express from "express";
 import { exec } from "child_process";
+import { SERVER_CONFIGS } from "./configs/serverConfigs";
 
 const app = express();
 app.use(express.json());
@@ -19,21 +20,24 @@ const DEPLOYMENT_PORT = 4000;
  * }
  */
 app.post("/deploy", (req, res) => {
-  const {
-    containerName,
-    image,
-    internalPort,
-    memory = "1g",
-    cpus = "1",
-    env = {},
-  } = req.body;
+  const { containerName, type, memory = "1g", cpus = "1" } = req.body;
 
-  if (!containerName || !image || !internalPort) {
-    return res.status(400).json({ error: "Missing required fields" });
+  if (!containerName || !type) {
+    return res
+      .status(400)
+      .json({ error: "containerName and type are required" });
   }
 
+  const config = SERVER_CONFIGS[type];
+
+  if (!config) {
+    return res.status(400).json({ error: "Invalid server type" });
+  }
+
+  const { image, internalPort, env } = config;
+
   const envArgs = Object.entries(env)
-    .map(([key, value]) => `-e ${key}=${value}`)
+    .map(([k, v]) => `-e ${k}=${v}`)
     .join(" ");
 
   const dockerRunCmd = `
@@ -63,12 +67,13 @@ app.post("/deploy", (req, res) => {
         });
       }
 
-      // Example output: 0.0.0.0:32768
       const hostPort = stdout.trim().split(":").pop();
 
       return res.json({
         containerName,
+        type,
         hostPort,
+        running: true,
       });
     });
   });
