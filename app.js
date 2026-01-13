@@ -1,6 +1,7 @@
 import express from "express";
 import { exec } from "child_process";
 import { SERVER_CONFIGS } from "./configs/serverConfigs.js";
+import { logInfo, logError } from "./logger.js";
 
 const app = express();
 app.use(express.json());
@@ -22,7 +23,15 @@ const DEPLOYMENT_PORT = 4000;
 app.post("/deploy", (req, res) => {
   const { containerName, type, memory = "1g", cpus = "1" } = req.body;
 
+  logInfo("Incoming deploy request", {
+    containerName,
+    type,
+    memory,
+    cpus,
+  });
+
   if (!containerName || !type) {
+    logError("Missing required fields", req.body);
     return res
       .status(400)
       .json({ error: "containerName and type are required" });
@@ -31,10 +40,18 @@ app.post("/deploy", (req, res) => {
   const config = SERVER_CONFIGS[type];
 
   if (!config) {
+    logError("Invalid server type", { type });
     return res.status(400).json({ error: "Invalid server type" });
   }
 
   const { image, internalPort, env } = config;
+
+  logInfo("Resolved server configuration", {
+    type,
+    image,
+    internalPort,
+    env,
+  });
 
   const envArgs = Object.entries(env)
     .map(([k, v]) => `-e ${k}=${v}`)
@@ -49,33 +66,67 @@ app.post("/deploy", (req, res) => {
     ${image}
   `;
 
-  exec(dockerRunCmd, (err) => {
+  logInfo("Executing docker run", {
+    containerName,
+    image,
+  });
+
+  exec(dockerRunCmd, (err, stdout, stderr) => {
     if (err) {
+      logError("Docker run failed", {
+        containerName,
+        stderr,
+        error: err.message,
+      });
+
       return res.status(500).json({
         error: "Docker run failed",
-        details: err.message,
+        details: stderr || err.message,
       });
     }
 
-    const inspectCmd = `docker port ${containerName} ${internalPort}`;
-
-    exec(inspectCmd, (err, stdout) => {
-      if (err) {
-        return res.status(500).json({
-          error: "Failed to get assigned port",
-          details: err.message,
-        });
-      }
-
-      const hostPort = stdout.trim().split(":").pop();
-
-      return res.json({
-        containerName,
-        type,
-        hostPort,
-        running: true,
-      });
+    logInfo("Docker container started", {
+      containerName,
+      stdout: stdout?.trim(),
     });
+
+    setTimeout(() => {
+      const inspectCmd = `docker port ${containerName} ${internalPort}`;
+
+      logInfo("Inspecting container port", {
+        containerName,
+        internalPort,
+      });
+
+      exec(inspectCmd, (err, stdout, stderr) => {
+        if (err) {
+          logError("Failed to get assigned port", {
+            containerName,
+            stderr,
+            error: err.message,
+          });
+
+          return res.status(500).json({
+            error: "Failed to get assigned port",
+            details: stderr || err.message,
+          });
+        }
+
+        const hostPort = stdout.trim().split(":").pop();
+
+        logInfo("Port assigned successfully", {
+          containerName,
+          hostPort,
+        });
+
+        return res.json({
+          containerName,
+          type,
+          hostPort,
+          running: true,
+        });
+      });
+    }, 1000);
   });
 });
 
