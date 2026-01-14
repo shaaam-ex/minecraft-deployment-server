@@ -3,10 +3,10 @@ import { exec } from "child_process";
 import { SERVER_CONFIGS } from "./configs/serverConfigs.js";
 import { logInfo, logError } from "./logger.js";
 import { SUPPORTED_VERSIONS } from "./enums/versions.js";
+import os from "os";
 
 const app = express();
 app.use(express.json());
-const os = require("os");
 
 const DEPLOYMENT_PORT = 4000;
 
