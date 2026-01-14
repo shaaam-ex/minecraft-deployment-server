@@ -6,6 +6,7 @@ import { SUPPORTED_VERSIONS } from "./enums/versions.js";
 
 const app = express();
 app.use(express.json());
+const os = require("os");
 
 const DEPLOYMENT_PORT = 4000;
 
@@ -21,6 +22,22 @@ const DEPLOYMENT_PORT = 4000;
  *   env?: object
  * }
  */
+
+function getIPv4Address() {
+  const interfaces = os.networkInterfaces();
+  for (const interfaceName in interfaces) {
+    const addresses = interfaces[interfaceName];
+
+    for (const addr of addresses) {
+      // Filter for IPv4 and ensure it's not a loopback address (127.0.0.1)
+      if (addr.family === "IPv4" && !addr.internal) {
+        return addr.address;
+      }
+    }
+  }
+  return "127.0.0.1"; // Fallback if no external IP is found
+}
+
 app.post("/deploy", (req, res) => {
   const { containerName, type, version, memory = "1g", cpus = "1" } = req.body;
 
@@ -32,13 +49,15 @@ app.post("/deploy", (req, res) => {
 
   if (!containerName || !type || !version) {
     return res.status(400).json({
-      error: "containerName, type and version are required",
+      success: false,
+      message: "containerName, type and version are required",
     });
   }
 
   if (!SUPPORTED_VERSIONS.includes(version)) {
     return res.status(400).json({
-      error: "Unsupported Minecraft version",
+      success: false,
+      message: "Unsupported Minecraft version",
     });
   }
 
@@ -46,7 +65,8 @@ app.post("/deploy", (req, res) => {
 
   if (!config) {
     return res.status(400).json({
-      error: "Invalid server type",
+      success: false,
+      message: "Invalid server type",
     });
   }
 
@@ -74,8 +94,8 @@ app.post("/deploy", (req, res) => {
     if (err) {
       logError("Docker run failed", { stderr });
       return res.status(500).json({
-        error: "Docker run failed",
-        details: stderr || err.message,
+        success: false,
+        message: "Docker run failed",
       });
     }
 
@@ -86,8 +106,8 @@ app.post("/deploy", (req, res) => {
         if (err) {
           logError("Port inspection failed", { stderr });
           return res.status(500).json({
-            error: "Failed to get assigned port",
-            details: stderr || err.message,
+            success: false,
+            message: "Failed to get assigned port",
           });
         }
 
@@ -100,12 +120,14 @@ app.post("/deploy", (req, res) => {
           type,
         });
 
-        res.json({
-          containerName,
-          type,
-          version,
-          hostPort,
-          running: true,
+        // Getting current ipv4 address
+
+        res.status(200).json({
+          success: true,
+          data: {
+            ipAddress: getIPv4Address,
+            port: hostPort,
+          },
         });
       });
     }, 1000);
