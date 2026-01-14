@@ -182,38 +182,35 @@ app.post("/delete", (req, res) => {
   });
 });
 
-app.get("/status/:containerName", (req, res) => {
+app.get("/metrics/:containerName", (req, res) => {
   const { containerName } = req.params;
-
   const processedContainerName = processContainerName(containerName);
 
-  const inspectCmd = `docker inspect ${processedContainerName}`;
+  // Stats command: returns a JSON string with CPU and RAM usage
+  const statsCmd = `docker stats ${processedContainerName} --no-stream --format "{{json .}}"`;
 
-  exec(inspectCmd, (err, stdout) => {
+  exec(statsCmd, (err, stdout) => {
     if (err) {
-      // Container does not exist
-      return res.json({
-        success: false,
-        message: "Container not found",
-      });
+      return res
+        .status(500)
+        .json({ success: false, message: "Container not found" });
     }
 
     try {
-      const data = JSON.parse(stdout)[0];
-      const state = data.State;
+      const stats = JSON.parse(stdout);
 
-      return res.json({
+      return res.status(200).json({
         success: true,
         data: {
-          containerName,
-          exists: true,
-          status: state.Running,
+          cpuUsage: stats.CPUPerc,
+          memoryUsage: stats.MemUsage,
+          memoryPerc: stats.MemPerc,
+          status: stats.CPUPerc !== "--",
         },
       });
     } catch (parseError) {
-      return res.status(500).json({
-        error: "Failed to parse docker inspect output",
-      });
+      console.log(parseError);
+      return res.status(500).json({ error: "Failed to parse stats output" });
     }
   });
 });
