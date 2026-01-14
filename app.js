@@ -157,6 +157,19 @@ app.post("/stop", (req, res) => {
   });
 });
 
+app.post("/start", (req, res) => {
+  const { containerName } = req.body;
+
+  const processedContainerName = processContainerName(containerName);
+
+  exec(`docker start ${processedContainerName}`, (err) => {
+    if (err) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
+    res.json({ success: true, status: "started" });
+  });
+});
+
 app.post("/delete", (req, res) => {
   const { containerName } = req.body;
 
