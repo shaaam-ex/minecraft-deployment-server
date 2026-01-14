@@ -151,9 +151,9 @@ app.post("/stop", (req, res) => {
 
   exec(`docker stop ${processedContainerName}`, (err) => {
     if (err) {
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ success: false, message: err.message });
     }
-    res.json({ status: "stopped" });
+    res.json({ success: true, status: "stopped" });
   });
 });
 
