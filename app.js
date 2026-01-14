@@ -38,6 +38,14 @@ function getIPv4Address() {
   return "127.0.0.1"; // Fallback if no external IP is found
 }
 
+function processContainerName(containerName) {
+  return containerName
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-_]/g, "");
+}
+
 app.post("/deploy", (req, res) => {
   const { containerName, type, version, memory = "1g", cpus = "1" } = req.body;
 
@@ -79,11 +87,7 @@ app.post("/deploy", (req, res) => {
     .map(([k, v]) => `-e ${k}=${v}`)
     .join(" ");
 
-  const processedContainerName = containerName
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9-_]/g, "");
+  const processedContainerName = processContainerName(containerName);
 
   const dockerRunCmd = `
     docker run -d -P \
@@ -94,7 +98,7 @@ app.post("/deploy", (req, res) => {
     ${config.image}
   `;
 
-  logInfo("Starting container", { containerName });
+  logInfo("Starting container", { processedContainerName });
 
   exec(dockerRunCmd, (err, stdout, stderr) => {
     if (err) {
@@ -106,7 +110,7 @@ app.post("/deploy", (req, res) => {
     }
 
     setTimeout(() => {
-      const inspectCmd = `docker port ${containerName} ${config.internalPort}`;
+      const inspectCmd = `docker port ${processedContainerName} ${config.internalPort}`;
 
       exec(inspectCmd, (err, stdout, stderr) => {
         if (err) {
@@ -120,7 +124,7 @@ app.post("/deploy", (req, res) => {
         const hostPort = stdout.trim().split(":").pop();
 
         logInfo("Server deployed successfully", {
-          containerName,
+          processedContainerName,
           hostPort,
           version,
           type,
@@ -143,7 +147,9 @@ app.post("/deploy", (req, res) => {
 app.post("/stop", (req, res) => {
   const { containerName } = req.body;
 
-  exec(`docker stop ${containerName}`, (err) => {
+  const processedContainerName = processContainerName(containerName);
+
+  exec(`docker stop ${processedContainerName}`, (err) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -154,9 +160,11 @@ app.post("/stop", (req, res) => {
 app.post("/delete", (req, res) => {
   const { containerName } = req.body;
 
-  exec(`docker rm ${containerName}`, (err) => {
+  const processedContainerName = processContainerName(containerName);
+
+  exec(`docker rm ${processedContainerName}`, (err) => {
     if (err) {
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ success: false, message: err.message });
     }
     res.json({ status: "deleted" });
   });
@@ -165,14 +173,16 @@ app.post("/delete", (req, res) => {
 app.get("/status/:containerName", (req, res) => {
   const { containerName } = req.params;
 
-  const inspectCmd = `docker inspect ${containerName}`;
+  const processedContainerName = processContainerName(containerName);
+
+  const inspectCmd = `docker inspect ${processedContainerName}`;
 
   exec(inspectCmd, (err, stdout) => {
     if (err) {
       // Container does not exist
       return res.json({
-        containerName,
-        exists: false,
+        success: false,
+        message: "Container not found",
       });
     }
 
@@ -181,9 +191,12 @@ app.get("/status/:containerName", (req, res) => {
       const state = data.State;
 
       return res.json({
-        containerName,
-        exists: true,
-        status: state.Running,
+        success: true,
+        data: {
+          containerName,
+          exists: true,
+          status: state.Running,
+        },
       });
     } catch (parseError) {
       return res.status(500).json({
