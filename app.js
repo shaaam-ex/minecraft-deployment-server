@@ -79,9 +79,15 @@ app.post("/deploy", (req, res) => {
     .map(([k, v]) => `-e ${k}=${v}`)
     .join(" ");
 
+  const processedContainerName = containerName
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-_]/g, "");
+
   const dockerRunCmd = `
     docker run -d -P \
-    --name ${containerName} \
+    --name ${processedContainerName} \
     --memory=${memory} \
     --cpus=${cpus} \
     ${envArgs} \
