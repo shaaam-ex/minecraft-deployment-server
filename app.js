@@ -135,7 +135,7 @@ app.post("/deploy", (req, res) => {
         res.status(200).json({
           success: true,
           data: {
-            ipAddress: getIPv4Address,
+            ipAddress: getIPv4Address(),
             port: hostPort,
           },
         });
