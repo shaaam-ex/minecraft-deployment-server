@@ -1,0 +1,3 @@
+[submodule "minecraft-commons"]
+	path = minecraft-commons
+	url = https://github.com/shaaam-ex/minecraft-commons.git
