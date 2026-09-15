@@ -1,5 +1,5 @@
 import express from "express";
-import { exec } from "child_process";
+import { exec, execFile } from "child_process";
 import { SERVER_CONFIGS } from "./configs/serverConfigs.js";
 import { logInfo, logError } from "./logger.js";
 import { SUPPORTED_VERSIONS } from "./enums/versions.js";
@@ -83,38 +83,45 @@ app.post("/deploy", (req, res) => {
     VERSION: version,
   };
 
-  const envArgs = Object.entries(env)
-    .map(([k, v]) => `-e ${k}=${v}`)
-    .join(" ");
-
   const processedContainerName = processContainerName(containerName);
 
-  const dockerRunCmd = `
-    docker run -d -P \
-    --name ${processedContainerName} \
-    --memory=${memory} \
-    --cpus=${cpus} \
-    ${envArgs} \
-    ${config.image}
-  `;
+  const dockerRunArgs = [
+    "run",
+    "-d",
+    "-P",
+    "--name",
+    processedContainerName,
+    `--memory=${memory}`,
+    `--cpus=${cpus}`,
+    ...Object.entries(env).flatMap(([key, value]) => ["-e", `${key}=${value}`]),
+    config.image,
+  ];
 
   logInfo("Starting container", { processedContainerName });
 
-  exec(dockerRunCmd, (err, stdout, stderr) => {
+  execFile("docker", dockerRunArgs, (err, stdout, stderr) => {
     if (err) {
-      logError("Docker run failed", { stderr });
+      logError("Docker run failed", { message: err.message, stderr });
       return res.status(500).json({
         success: false,
         message: "Docker run failed",
       });
     }
 
-    setTimeout(() => {
-      const inspectCmd = `docker port ${processedContainerName} ${config.internalPort}`;
+    const containerId = stdout.trim();
+    logInfo("Container started", { processedContainerName, containerId });
 
-      exec(inspectCmd, (err, stdout, stderr) => {
+    setTimeout(() => {
+      execFile(
+        "docker",
+        ["port", containerId, String(config.internalPort)],
+        (err, stdout, stderr) => {
         if (err) {
-          logError("Port inspection failed", { stderr });
+          logError("Port inspection failed", {
+            message: err.message,
+            stderr,
+            containerId,
+          });
           return res.status(500).json({
             success: false,
             message: "Failed to get assigned port",
@@ -138,7 +145,8 @@ app.post("/deploy", (req, res) => {
             port: hostPort,
           },
         });
-      });
+        }
+      );
     }, 1000);
   });
 });
